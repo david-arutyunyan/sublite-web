@@ -28,13 +28,16 @@ export function AdminPlansPage() {
   const [plans, setPlans] = useState<AdminPlan[]>([]);
   const [prices, setPrices] = useState<Record<string, AdminPlanPrice[]>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState<CreatePlanForm>(EMPTY_CREATE_FORM);
   const [isCreating, setIsCreating] = useState(false);
   const [priceForms, setPriceForms] = useState<Record<string, { billingPeriod: BillingPeriod; amount: string; currency: string }>>({});
+  const [togglingPlanIds, setTogglingPlanIds] = useState<Set<string>>(new Set());
 
   function loadPlans() {
     setIsLoading(true);
+    setLoadError(null);
     adminPlansApi
       .list()
       .then(async (list) => {
@@ -42,7 +45,7 @@ export function AdminPlansPage() {
         const entries = await Promise.all(list.map(async (plan) => [plan.id, await adminPlansApi.listPrices(plan.id)] as const));
         setPrices(Object.fromEntries(entries));
       })
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Could not load plans.'))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Could not load plans.'))
       .finally(() => setIsLoading(false));
   }
 
@@ -50,7 +53,12 @@ export function AdminPlansPage() {
 
   async function handleCreate(event: FormEvent) {
     event.preventDefault();
-    setError(null);
+    const amount = Number(createForm.amount);
+    if (!Number.isFinite(amount)) {
+      setMutationError('Amount must be a number.');
+      return;
+    }
+    setMutationError(null);
     setIsCreating(true);
     try {
       await adminPlansApi.create({
@@ -58,25 +66,32 @@ export function AdminPlansPage() {
         name: createForm.name,
         description: createForm.description,
         billingPeriod: createForm.billingPeriod,
-        amount: Number(createForm.amount),
+        amount,
         currency: createForm.currency,
       });
       setCreateForm(EMPTY_CREATE_FORM);
       loadPlans();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not create the plan.');
+      setMutationError(err instanceof ApiError ? err.message : 'Could not create the plan.');
     } finally {
       setIsCreating(false);
     }
   }
 
   async function handleToggleActive(plan: AdminPlan) {
-    setError(null);
+    setMutationError(null);
+    setTogglingPlanIds((current) => new Set(current).add(plan.id));
     try {
       const updated = await adminPlansApi.setActive(plan.id, !plan.active);
       setPlans((current) => current.map((p) => (p.id === updated.id ? updated : p)));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not update the plan.');
+      setMutationError(err instanceof ApiError ? err.message : 'Could not update the plan.');
+    } finally {
+      setTogglingPlanIds((current) => {
+        const next = new Set(current);
+        next.delete(plan.id);
+        return next;
+      });
     }
   }
 
@@ -87,17 +102,22 @@ export function AdminPlansPage() {
   async function handleAddPrice(event: FormEvent, planId: string) {
     event.preventDefault();
     const form = priceForm(planId);
-    setError(null);
+    const amount = Number(form.amount);
+    if (!Number.isFinite(amount)) {
+      setMutationError('Amount must be a number.');
+      return;
+    }
+    setMutationError(null);
     try {
       const newPrice = await adminPlansApi.addPrice(planId, {
         billingPeriod: form.billingPeriod,
-        amount: Number(form.amount),
+        amount,
         currency: form.currency,
       });
       setPrices((current) => ({ ...current, [planId]: [...(current[planId] ?? []), newPrice] }));
       setPriceForms((current) => ({ ...current, [planId]: { billingPeriod: 'MONTHLY', amount: '', currency: 'USD' } }));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not add the price.');
+      setMutationError(err instanceof ApiError ? err.message : 'Could not add the price.');
     }
   }
 
@@ -108,7 +128,7 @@ export function AdminPlansPage() {
         <Link to="/admin">Back</Link>
       </header>
 
-      {error && <p className="form-error">{error}</p>}
+      {mutationError && <p className="form-error">{mutationError}</p>}
 
       <div className="card">
         <h2>New plan</h2>
@@ -176,11 +196,13 @@ export function AdminPlansPage() {
       </div>
 
       {isLoading && <p className="page-status">Loading plans…</p>}
+      {loadError && <p className="form-error">{loadError}</p>}
 
-      {!isLoading && (
+      {!isLoading && !loadError && (
         <div className="plan-list">
           {plans.map((plan) => {
             const form = priceForm(plan.id);
+            const isToggling = togglingPlanIds.has(plan.id);
             return (
               <div key={plan.id} className="plan-card">
                 <div className="subscription-title">
@@ -239,8 +261,8 @@ export function AdminPlansPage() {
                 </form>
 
                 <div className="button-row">
-                  <button className="button-secondary" onClick={() => handleToggleActive(plan)}>
-                    {plan.active ? 'Deactivate' : 'Activate'}
+                  <button className="button-secondary" onClick={() => handleToggleActive(plan)} disabled={isToggling}>
+                    {isToggling ? 'Saving…' : plan.active ? 'Deactivate' : 'Activate'}
                   </button>
                 </div>
               </div>

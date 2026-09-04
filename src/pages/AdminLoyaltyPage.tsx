@@ -9,17 +9,19 @@ const EVENT_TYPES: LoyaltyEventType[] = ['PAYMENT_SUCCESS'];
 export function AdminLoyaltyPage() {
   const [rules, setRules] = useState<LoyaltyRule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [eventType, setEventType] = useState<LoyaltyEventType>('PAYMENT_SUCCESS');
   const [points, setPoints] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   function loadRules() {
     setIsLoading(true);
+    setLoadError(null);
     adminLoyaltyApi
       .list()
       .then(setRules)
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Could not load loyalty rules.'))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Could not load loyalty rules.'))
       .finally(() => setIsLoading(false));
   }
 
@@ -27,14 +29,14 @@ export function AdminLoyaltyPage() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    setError(null);
+    setSaveError(null);
     setIsSaving(true);
     try {
       await adminLoyaltyApi.setRule(eventType, Number(points));
       setPoints('');
       loadRules();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not save the rule.');
+      setSaveError(err instanceof ApiError ? err.message : 'Could not save the rule.');
     } finally {
       setIsSaving(false);
     }
@@ -47,7 +49,7 @@ export function AdminLoyaltyPage() {
         <Link to="/admin">Back</Link>
       </header>
 
-      {error && <p className="form-error">{error}</p>}
+      {saveError && <p className="form-error">{saveError}</p>}
 
       <div className="card">
         <h2>Set active rule</h2>
@@ -77,8 +79,9 @@ export function AdminLoyaltyPage() {
       </div>
 
       {isLoading && <p className="page-status">Loading rules…</p>}
+      {loadError && <p className="form-error">{loadError}</p>}
 
-      {!isLoading && (
+      {!isLoading && !loadError && (
         <div className="card">
           <h2>All rules</h2>
           {rules.length === 0 && <p className="page-status">No rules configured yet.</p>}

@@ -11,7 +11,8 @@ export function AdminRetentionPage() {
   const [offers, setOffers] = useState<RetentionOffer[]>([]);
   const [steps, setSteps] = useState<RetentionStep[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
   const [offerCode, setOfferCode] = useState('');
   const [offerType, setOfferType] = useState<RetentionOfferType>('DISCOUNT_PERCENT');
@@ -23,14 +24,17 @@ export function AdminRetentionPage() {
   const [stepOfferId, setStepOfferId] = useState('');
   const [isCreatingStep, setIsCreatingStep] = useState(false);
 
+  const [togglingStepIds, setTogglingStepIds] = useState<Set<string>>(new Set());
+
   function loadAll() {
     setIsLoading(true);
+    setLoadError(null);
     Promise.all([adminRetentionApi.listOffers(), adminRetentionApi.listSteps()])
       .then(([offerList, stepList]) => {
         setOffers(offerList);
         setSteps(stepList);
       })
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Could not load retention config.'))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Could not load retention config.'))
       .finally(() => setIsLoading(false));
   }
 
@@ -38,22 +42,26 @@ export function AdminRetentionPage() {
 
   async function handleCreateOffer(event: FormEvent) {
     event.preventDefault();
-    setError(null);
-    let parameters: Record<string, unknown>;
+    let parameters: unknown;
     try {
       parameters = JSON.parse(offerParameters);
     } catch {
-      setError('Parameters must be valid JSON.');
+      setMutationError('Parameters must be valid JSON.');
       return;
     }
+    if (typeof parameters !== 'object' || parameters === null || Array.isArray(parameters)) {
+      setMutationError('Parameters must be a JSON object, e.g. {"percent": 20}.');
+      return;
+    }
+    setMutationError(null);
     setIsCreatingOffer(true);
     try {
-      await adminRetentionApi.createOffer({ code: offerCode, type: offerType, parameters });
+      await adminRetentionApi.createOffer({ code: offerCode, type: offerType, parameters: parameters as Record<string, unknown> });
       setOfferCode('');
       setOfferParameters('{}');
       loadAll();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not create the offer.');
+      setMutationError(err instanceof ApiError ? err.message : 'Could not create the offer.');
     } finally {
       setIsCreatingOffer(false);
     }
@@ -61,11 +69,16 @@ export function AdminRetentionPage() {
 
   async function handleCreateStep(event: FormEvent) {
     event.preventDefault();
-    setError(null);
+    const order = Number(stepOrder);
+    if (!Number.isFinite(order)) {
+      setMutationError('Step order must be a number.');
+      return;
+    }
+    setMutationError(null);
     setIsCreatingStep(true);
     try {
       await adminRetentionApi.createStep({
-        stepOrder: Number(stepOrder),
+        stepOrder: order,
         type: stepType,
         offerId: stepType === 'OFFER' ? stepOfferId || null : null,
       });
@@ -73,19 +86,26 @@ export function AdminRetentionPage() {
       setStepOfferId('');
       loadAll();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not create the step.');
+      setMutationError(err instanceof ApiError ? err.message : 'Could not create the step.');
     } finally {
       setIsCreatingStep(false);
     }
   }
 
   async function handleToggleStep(step: RetentionStep) {
-    setError(null);
+    setMutationError(null);
+    setTogglingStepIds((current) => new Set(current).add(step.id));
     try {
       const updated = await adminRetentionApi.setStepActive(step.id, !step.active);
       setSteps((current) => current.map((s) => (s.id === updated.id ? updated : s)));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not update the step.');
+      setMutationError(err instanceof ApiError ? err.message : 'Could not update the step.');
+    } finally {
+      setTogglingStepIds((current) => {
+        const next = new Set(current);
+        next.delete(step.id);
+        return next;
+      });
     }
   }
 
@@ -96,7 +116,7 @@ export function AdminRetentionPage() {
         <Link to="/admin">Back</Link>
       </header>
 
-      {error && <p className="form-error">{error}</p>}
+      {mutationError && <p className="form-error">{mutationError}</p>}
 
       <div className="card">
         <h2>New offer</h2>
@@ -129,7 +149,10 @@ export function AdminRetentionPage() {
         </form>
       </div>
 
-      {!isLoading && (
+      {isLoading && <p className="page-status">Loading…</p>}
+      {loadError && <p className="form-error">{loadError}</p>}
+
+      {!isLoading && !loadError && (
         <div className="card">
           <h2>Offers</h2>
           {offers.length === 0 && <p className="page-status">No offers configured yet.</p>}
@@ -189,7 +212,7 @@ export function AdminRetentionPage() {
         </form>
       </div>
 
-      {!isLoading && (
+      {!isLoading && !loadError && (
         <div className="card">
           <h2>Steps</h2>
           {steps.length === 0 && <p className="page-status">No steps configured yet.</p>}
@@ -197,23 +220,26 @@ export function AdminRetentionPage() {
             {steps
               .slice()
               .sort((a, b) => a.stepOrder - b.stepOrder)
-              .map((step) => (
-                <li key={step.id}>
-                  <div>
-                    <span className="loyalty-amount">
-                      #{step.stepOrder} {step.type}
-                    </span>
-                    {step.offerId && (
-                      <span className="loyalty-reason">
-                        offer: {offers.find((o) => o.id === step.offerId)?.code ?? step.offerId}
+              .map((step) => {
+                const isToggling = togglingStepIds.has(step.id);
+                return (
+                  <li key={step.id}>
+                    <div>
+                      <span className="loyalty-amount">
+                        #{step.stepOrder} {step.type}
                       </span>
-                    )}
-                  </div>
-                  <button className="button-secondary" onClick={() => handleToggleStep(step)}>
-                    {step.active ? 'Deactivate' : 'Activate'}
-                  </button>
-                </li>
-              ))}
+                      {step.offerId && (
+                        <span className="loyalty-reason">
+                          offer: {offers.find((o) => o.id === step.offerId)?.code ?? step.offerId}
+                        </span>
+                      )}
+                    </div>
+                    <button className="button-secondary" onClick={() => handleToggleStep(step)} disabled={isToggling}>
+                      {isToggling ? 'Saving…' : step.active ? 'Deactivate' : 'Activate'}
+                    </button>
+                  </li>
+                );
+              })}
           </ul>
         </div>
       )}
