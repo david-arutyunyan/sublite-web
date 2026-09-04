@@ -28,6 +28,17 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_STORAGE_KEY);
 }
 
+/**
+ * A 401 mid-session (an expired token, or a local backend restarted with a
+ * fresh dev signing key) used to just surface as an inert ApiError on
+ * whatever page triggered it - every retry would fail the same way, and
+ * the only way out was manually clicking "Log out". AuthContext listens
+ * for this and clears its user state, which ProtectedRoute already turns
+ * into a redirect to /login - no direct dependency from this module (a
+ * plain fetch wrapper) on React Router or AuthContext needed.
+ */
+export const UNAUTHORIZED_EVENT = 'sublite:unauthorized';
+
 interface ProblemDetail {
   detail?: string;
 }
@@ -49,6 +60,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     // response that has no JSON body at all (a bare 401 from the
     // security filter chain itself, before any controller runs).
     const body = (await response.json().catch(() => null)) as ProblemDetail | null;
+    if (response.status === 401 && token) {
+      // Only for a request that WAS carrying a token - a 401 on login/
+      // register with a bad password is a normal auth failure the caller
+      // already handles inline, not a session that just expired.
+      clearToken();
+      window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    }
     throw new ApiError(response.status, body?.detail ?? response.statusText ?? `Request failed (${response.status})`);
   }
 

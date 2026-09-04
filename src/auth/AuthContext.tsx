@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { authApi } from '../api/auth';
-import { clearToken, getToken, setToken as persistToken } from '../api/client';
+import { clearToken, getToken, setToken as persistToken, UNAUTHORIZED_EVENT } from '../api/client';
 import type { MeResponse } from '../api/types';
 
 interface AuthContextValue {
@@ -33,6 +33,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(setUser)
       .catch(() => clearToken())
       .finally(() => setIsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    function handleUnauthorized() {
+      setUser(null);
+    }
+    window.addEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
   }, []);
 
   async function login(email: string, password: string) {
