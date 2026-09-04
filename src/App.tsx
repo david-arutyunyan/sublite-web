@@ -5,6 +5,7 @@ import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { PlansPage } from './pages/PlansPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { SubscriptionPage } from './pages/SubscriptionPage';
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
                 keeping the whole page behind ProtectedRoute for now is the
                 simpler, honest scope rather than a half-built public path. */}
             <Route path="/plans" element={<PlansPage />} />
+            <Route path="/subscription" element={<SubscriptionPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

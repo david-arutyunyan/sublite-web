@@ -6,11 +6,10 @@ import type { MySubscription } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 
 /**
- * Deliberately only a compact summary of the subscription, not the full
- * picture (a visual start/current-period/end timeline, pause/cancel) -
- * that's the next step. This just has to know enough to decide "browse
- * plans" vs "you already have one," since GET /subscriptions/me is what
- * that decision needs either way.
+ * Deliberately only a compact summary of the subscription - the full
+ * picture (visual timeline) is /subscription (SubscriptionPage). This
+ * just has to know enough to decide "browse plans" vs "you already have
+ * one," since GET /subscriptions/me is what that decision needs either way.
  */
 export function HomePage() {
   const { user, logout } = useAuth();
@@ -50,6 +49,7 @@ export function HomePage() {
             {subscription.status} · {subscription.amount} {subscription.currency} /{' '}
             {subscription.billingPeriod.toLowerCase()}
           </p>
+          <Link to="/subscription">View details</Link>
         </div>
       )}
 
