@@ -14,11 +14,27 @@ const STATUS_LABELS: Record<SubscriptionStatus, string> = {
 };
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return new Date(iso).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function daysBetween(from: Date, to: Date): number {
-  return Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+/**
+ * Plan billing periods are normally weeks/months long, where "N days
+ * left" is the right granularity - but nothing stops a period from being
+ * much shorter (an admin-adjusted demo subscription, say), and "0 days
+ * left" for the whole last day of a normal period isn't informative
+ * either. Steps down to whatever unit actually has a nonzero count left.
+ */
+function formatTimeLeft(ms: number): string {
+  const totalMinutes = Math.max(0, Math.round(ms / (1000 * 60)));
+  if (totalMinutes < 60) {
+    return `${totalMinutes} minute${totalMinutes === 1 ? '' : 's'}`;
+  }
+  const totalHours = Math.round(totalMinutes / 60);
+  if (totalHours < 24) {
+    return `${totalHours} hour${totalHours === 1 ? '' : 's'}`;
+  }
+  const totalDays = Math.round(totalHours / 24);
+  return `${totalDays} day${totalDays === 1 ? '' : 's'}`;
 }
 
 /**
@@ -37,17 +53,28 @@ export function SubscriptionPage() {
   const [cancelError, setCancelError] = useState<string | null>(null);
 
   useEffect(() => {
-    subscriptionsApi
-      .getMine()
-      .then(setSubscription)
-      .catch((err) => {
-        if (err instanceof ApiError && err.status === 404) {
-          navigate('/plans', { replace: true });
-          return;
-        }
-        setError(err instanceof ApiError ? err.message : 'Could not load your subscription.');
-      })
-      .finally(() => setIsLoading(false));
+    function load() {
+      subscriptionsApi
+        .getMine()
+        .then(setSubscription)
+        .catch((err) => {
+          if (err instanceof ApiError && err.status === 404) {
+            navigate('/plans', { replace: true });
+            return;
+          }
+          setError(err instanceof ApiError ? err.message : 'Could not load your subscription.');
+        })
+        .finally(() => setIsLoading(false));
+    }
+
+    load();
+    // Re-polls rather than just computing a static countdown once: a
+    // period can be short enough (an admin-adjusted demo subscription,
+    // say) that status actually changes - ACTIVE renewing for another
+    // period, or flipping to GRACE_PERIOD - while this page sits open,
+    // and that transition should show up without a manual reload.
+    const intervalId = setInterval(load, 15_000);
+    return () => clearInterval(intervalId);
   }, [navigate]);
 
   if (isLoading) {
@@ -76,10 +103,10 @@ export function SubscriptionPage() {
   const now = new Date();
   const start = new Date(subscription.currentPeriodStart);
   const end = new Date(subscription.currentPeriodEnd);
-  const totalDays = Math.max(1, daysBetween(start, end));
-  const elapsedDays = Math.min(totalDays, Math.max(0, daysBetween(start, now)));
-  const progressPercent = Math.round((elapsedDays / totalDays) * 100);
-  const daysLeft = Math.max(0, daysBetween(now, end));
+  const totalMs = Math.max(1, end.getTime() - start.getTime());
+  const elapsedMs = Math.min(totalMs, Math.max(0, now.getTime() - start.getTime()));
+  const progressPercent = Math.round((elapsedMs / totalMs) * 100);
+  const msLeft = Math.max(0, end.getTime() - now.getTime());
 
   let caption: string;
   if (subscription.status === 'GRACE_PERIOD') {
@@ -87,7 +114,7 @@ export function SubscriptionPage() {
   } else if (subscription.status === 'PAUSED') {
     caption = `Paused. Resumes ${formatDate(subscription.currentPeriodEnd)}.`;
   } else {
-    caption = `${daysLeft} day${daysLeft === 1 ? '' : 's'} left in this period.`;
+    caption = `${formatTimeLeft(msLeft)} left in this period.`;
   }
 
   return (
