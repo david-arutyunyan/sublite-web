@@ -1,6 +1,11 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { AdminRoute } from './auth/AdminRoute';
 import { AuthProvider } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
+import { AdminLoyaltyPage } from './pages/AdminLoyaltyPage';
+import { AdminPage } from './pages/AdminPage';
+import { AdminPlansPage } from './pages/AdminPlansPage';
+import { AdminRetentionPage } from './pages/AdminRetentionPage';
 import { CancellationPage } from './pages/CancellationPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
@@ -27,6 +32,12 @@ export default function App() {
             <Route path="/subscription" element={<SubscriptionPage />} />
             <Route path="/cancellation/:attemptId" element={<CancellationPage />} />
             <Route path="/loyalty" element={<LoyaltyPage />} />
+            <Route element={<AdminRoute />}>
+              <Route path="/admin" element={<AdminPage />} />
+              <Route path="/admin/plans" element={<AdminPlansPage />} />
+              <Route path="/admin/loyalty" element={<AdminLoyaltyPage />} />
+              <Route path="/admin/retention" element={<AdminRetentionPage />} />
+            </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

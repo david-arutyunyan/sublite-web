@@ -44,6 +44,12 @@ export function HomePage() {
         <Link to="/loyalty">Loyalty points</Link>
       </p>
 
+      {user?.role === 'ADMIN' && (
+        <p>
+          <Link to="/admin">Admin</Link>
+        </p>
+      )}
+
       {isLoading && <p className="page-status">Loading your subscription…</p>}
 
       {!isLoading && subscription && (

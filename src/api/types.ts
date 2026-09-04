@@ -92,3 +92,54 @@ export interface LoyaltyTransaction {
   reason: string;
   occurredAt: string;
 }
+
+// --- Admin-only shapes below. Separate from the customer-facing Plan/
+// PlanPrice above (those are the public catalog's PublicPlanResponse,
+// which is deliberately a subset - no `active`/timestamps) rather than
+// reusing one type for both.
+
+export interface AdminPlan {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminPlanPrice {
+  id: string;
+  billingPeriod: BillingPeriod;
+  amount: number;
+  currency: string;
+  createdAt: string;
+}
+
+export type LoyaltyEventType = 'PAYMENT_SUCCESS';
+
+export interface LoyaltyRule {
+  id: string;
+  eventType: LoyaltyEventType;
+  points: number;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface RetentionOffer {
+  id: string;
+  code: string;
+  type: RetentionOfferType;
+  parameters: Record<string, unknown>;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface RetentionStep {
+  id: string;
+  stepOrder: number;
+  type: RetentionStepType;
+  offerId: string | null;
+  active: boolean;
+  createdAt: string;
+}
