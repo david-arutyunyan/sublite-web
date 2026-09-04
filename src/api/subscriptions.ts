@@ -7,4 +7,6 @@ export const subscriptionsApi = {
   // customer has never subscribed (or their only subscription is
   // CANCELLED) - that's the normal "nothing yet" state, not a real error.
   getMine: () => api.get<MySubscription>('/subscriptions/me'),
+  // Only valid while the subscription is GRACE_PERIOD - a 409 otherwise.
+  retryPayment: () => api.post<MySubscription>('/subscriptions/me/retry-payment'),
 };

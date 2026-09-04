@@ -51,6 +51,8 @@ export function SubscriptionPage() {
   const [error, setError] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [isRetryingPayment, setIsRetryingPayment] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
 
   useEffect(() => {
     function load() {
@@ -97,6 +99,18 @@ export function SubscriptionPage() {
     } catch (err) {
       setCancelError(err instanceof ApiError ? err.message : 'Could not start cancellation. Try again.');
       setIsCancelling(false);
+    }
+  }
+
+  async function handleRetryPaymentClick() {
+    setRetryError(null);
+    setIsRetryingPayment(true);
+    try {
+      setSubscription(await subscriptionsApi.retryPayment());
+    } catch (err) {
+      setRetryError(err instanceof ApiError ? err.message : 'Could not retry the payment. Try again.');
+    } finally {
+      setIsRetryingPayment(false);
     }
   }
 
@@ -151,6 +165,16 @@ export function SubscriptionPage() {
 
         {subscription.cancelAtPeriodEnd && (
           <p className="form-error">This subscription will not renew after the current period.</p>
+        )}
+
+        {retryError && <p className="form-error">{retryError}</p>}
+
+        {subscription.status === 'GRACE_PERIOD' && (
+          <div className="button-row">
+            <button onClick={handleRetryPaymentClick} disabled={isRetryingPayment}>
+              {isRetryingPayment ? 'Retrying…' : 'Retry payment'}
+            </button>
+          </div>
         )}
 
         {cancelError && <p className="form-error">{cancelError}</p>}
