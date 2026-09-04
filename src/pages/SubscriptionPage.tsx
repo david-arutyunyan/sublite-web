@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError } from '../api/client';
+import { cancellationApi } from '../api/cancellation';
 import { subscriptionsApi } from '../api/subscriptions';
 import type { MySubscription, SubscriptionStatus } from '../api/types';
 
@@ -21,18 +22,19 @@ function daysBetween(from: Date, to: Date): number {
 }
 
 /**
- * No pause/cancel buttons here on purpose: there's no standalone "pause"
- * endpoint on the backend at all (pausing only ever happens as the effect
- * of accepting a PAUSE_SUBSCRIPTION retention offer), and cancelling means
- * starting that same retention flow (POST /subscriptions/{id}/cancellation)
- * - not a single-call action this page could wire up on its own without
- * building a half-working stub for the flow itself. That flow is next.
+ * Still no standalone "pause" button: pausing only ever happens as the
+ * effect of accepting a PAUSE_SUBSCRIPTION retention offer, there's no
+ * direct endpoint for it. Cancelling starts the retention flow
+ * (POST /subscriptions/{id}/cancellation) and hands off to CancellationPage,
+ * which renders whatever step the backend says is current.
  */
 export function SubscriptionPage() {
   const navigate = useNavigate();
   const [subscription, setSubscription] = useState<MySubscription | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   useEffect(() => {
     subscriptionsApi
@@ -57,6 +59,18 @@ export function SubscriptionPage() {
   if (!subscription) {
     // Already navigating to /plans (no active subscription) - nothing to render.
     return null;
+  }
+
+  async function handleCancelClick(subscriptionId: string) {
+    setCancelError(null);
+    setIsCancelling(true);
+    try {
+      const attempt = await cancellationApi.start(subscriptionId);
+      navigate(`/cancellation/${attempt.id}`);
+    } catch (err) {
+      setCancelError(err instanceof ApiError ? err.message : 'Could not start cancellation. Try again.');
+      setIsCancelling(false);
+    }
   }
 
   const now = new Date();
@@ -110,6 +124,20 @@ export function SubscriptionPage() {
 
         {subscription.cancelAtPeriodEnd && (
           <p className="form-error">This subscription will not renew after the current period.</p>
+        )}
+
+        {cancelError && <p className="form-error">{cancelError}</p>}
+
+        {subscription.status !== 'CANCELLED' && !subscription.cancelAtPeriodEnd && (
+          <div className="button-row">
+            <button
+              className="button-danger"
+              onClick={() => handleCancelClick(subscription.id)}
+              disabled={isCancelling}
+            >
+              Cancel subscription
+            </button>
+          </div>
         )}
       </div>
     </div>

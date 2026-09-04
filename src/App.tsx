@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
+import { CancellationPage } from './pages/CancellationPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { PlansPage } from './pages/PlansPage';
@@ -23,6 +24,7 @@ export default function App() {
                 simpler, honest scope rather than a half-built public path. */}
             <Route path="/plans" element={<PlansPage />} />
             <Route path="/subscription" element={<SubscriptionPage />} />
+            <Route path="/cancellation/:attemptId" element={<CancellationPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -53,3 +53,28 @@ export interface MySubscription {
   cancelAtPeriodEnd: boolean;
   cancelledAt: string | null;
 }
+
+export type CancellationAttemptStatus = 'IN_PROGRESS' | 'RETAINED' | 'CANCELLED';
+export type RetentionStepType = 'SURVEY' | 'OFFER' | 'CONFIRMATION';
+export type RetentionOfferType = 'DISCOUNT_PERCENT' | 'PAUSE_SUBSCRIPTION' | 'LOYALTY_POINTS';
+
+export interface CurrentStep {
+  type: RetentionStepType;
+  offerId: string | null;
+  offerCode: string | null;
+  offerType: RetentionOfferType | null;
+  offerParameters: Record<string, unknown> | null;
+}
+
+export interface CancellationAttempt {
+  id: string;
+  subscriptionId: string;
+  status: CancellationAttemptStatus;
+  reason: string | null;
+  acceptedOfferId: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  // null once status isn't IN_PROGRESS anymore - see
+  // CancellationAttemptResponse's own javadoc in sublite-core.
+  currentStep: CurrentStep | null;
+}
