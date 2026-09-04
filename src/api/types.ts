@@ -78,3 +78,17 @@ export interface CancellationAttempt {
   // CancellationAttemptResponse's own javadoc in sublite-core.
   currentStep: CurrentStep | null;
 }
+
+export interface LoyaltyBalance {
+  balance: number;
+}
+
+export type LoyaltyTransactionType = 'EARN' | 'REDEEM';
+
+export interface LoyaltyTransaction {
+  id: string;
+  type: LoyaltyTransactionType;
+  points: number;
+  reason: string;
+  occurredAt: string;
+}

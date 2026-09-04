@@ -4,6 +4,7 @@ import { ProtectedRoute } from './auth/ProtectedRoute';
 import { CancellationPage } from './pages/CancellationPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
+import { LoyaltyPage } from './pages/LoyaltyPage';
 import { PlansPage } from './pages/PlansPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { SubscriptionPage } from './pages/SubscriptionPage';
@@ -25,6 +26,7 @@ export default function App() {
             <Route path="/plans" element={<PlansPage />} />
             <Route path="/subscription" element={<SubscriptionPage />} />
             <Route path="/cancellation/:attemptId" element={<CancellationPage />} />
+            <Route path="/loyalty" element={<LoyaltyPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

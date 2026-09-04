@@ -40,6 +40,10 @@ export function HomePage() {
         Logged in as <strong>{user?.email}</strong> ({user?.role}).
       </p>
 
+      <p>
+        <Link to="/loyalty">Loyalty points</Link>
+      </p>
+
       {isLoading && <p className="page-status">Loading your subscription…</p>}
 
       {!isLoading && subscription && (
